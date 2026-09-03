@@ -760,11 +760,53 @@ function createCard(title, imgSrc, showAddButton = false, isPlaylist = false, cl
     if (shareInfo && shareInfo.link) htmlContent += `<div class="share-badge" title="Compartilhar"><i class="fas fa-share-nodes"></i></div>`;
     if(isPlaylist) htmlContent += `<span class="media-type-badge"><i class="fas fa-photo-film"></i> Playlist</span>`;
     if(showAddButton) htmlContent += `<button class="add-music-badge"><i class="fas fa-plus"></i> ${isPlaylist ? "Add Playlist" : "Adicionar"}</button>`;
-    if(realIndex >= 0) htmlContent += `<div class="quick-edit-badge" title="Editar"><i class="fas fa-cog"></i></div>`;
+    if(realIndex >= 0) {
+        htmlContent += `<div class="quick-edit-badge" title="Editar mídia" aria-label="Editar mídia"><i class="fas fa-cog"></i></div>`;
+        htmlContent += `<button type="button" class="media-delete-badge" title="Excluir mídia" aria-label="Excluir mídia"><i class="fas fa-trash"></i></button>`;
+    }
+    const isCollectionCard = favInfo && (favInfo.tipo === 'categoria' || favInfo.tipo === 'subcategoria');
+    const isDynamicRecent = favInfo && favInfo.tipo === 'subcategoria' && favInfo.subcategoria === 'Vídeos Recentes';
+    if (isCollectionCard && !isDynamicRecent) {
+        htmlContent += `<div class="collection-card-actions">
+            <button type="button" class="collection-action-btn collection-edit-btn" title="Editar" aria-label="Editar ${favInfo.tipo}"><i class="fas fa-cog"></i></button>
+            <button type="button" class="collection-action-btn collection-delete-btn" title="Excluir" aria-label="Excluir ${favInfo.tipo}"><i class="fas fa-trash"></i></button>
+        </div>`;
+    }
     card.innerHTML = htmlContent;
     if(clickCallback) card.addEventListener('click', clickCallback);
     if(realIndex >= 0 && card.querySelector('.quick-edit-badge')) {
         card.querySelector('.quick-edit-badge').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openAdvancedEditModal(realIndex); });
+    }
+    const mediaDelete = card.querySelector('.media-delete-badge');
+    if (mediaDelete && realIndex >= 0) {
+        mediaDelete.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            if (confirm(`Excluir a mídia "${title}"?`)) deletarMidiaUnica(realIndex);
+        });
+    }
+    const collectionEdit = card.querySelector('.collection-edit-btn');
+    if (collectionEdit && favInfo) {
+        collectionEdit.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            if (favInfo.tipo === 'categoria') {
+                const novoNome = prompt('Novo nome para a Categoria:', favInfo.categoria);
+                if (novoNome && novoNome.trim() && novoNome.trim() !== favInfo.categoria) renomearCategoriaCompleta(favInfo.categoria, novoNome.trim());
+            } else {
+                const novoNome = prompt('Novo nome para a Subcategoria:', favInfo.subcategoria);
+                if (novoNome && novoNome.trim() && novoNome.trim() !== favInfo.subcategoria) renomearSubcategoriaCompleta(favInfo.categoria, favInfo.subcategoria, novoNome.trim());
+            }
+        });
+    }
+    const collectionDelete = card.querySelector('.collection-delete-btn');
+    if (collectionDelete && favInfo) {
+        collectionDelete.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            if (favInfo.tipo === 'categoria') {
+                if (confirm(`Excluir a categoria "${favInfo.categoria}" e todo o seu conteúdo?`)) deletarCategoriaCompleta(favInfo.categoria);
+            } else if (confirm(`Excluir a subcategoria "${favInfo.subcategoria}" e todo o seu conteúdo?`)) {
+                deletarSubcategoria(favInfo.categoria, favInfo.subcategoria);
+            }
+        });
     }
     const badgeFav = card.querySelector('.fav-badge');
     if (badgeFav && favInfo) {
@@ -1289,11 +1331,32 @@ function downloadJSON(obj, filename) {
     document.body.appendChild(a); a.click(); a.remove();
 }
 
+function syncSidebarLayout() {
+    const sidebar = document.getElementById('sidebar');
+    const contentBody = document.querySelector('.content-body');
+    if (!sidebar || !contentBody) return;
+
+    const isMobile = window.innerWidth <= 768;
+    const expanded = isMobile ? sidebar.classList.contains('open') : !sidebar.classList.contains('collapsed');
+    contentBody.classList.toggle('sidebar-collapsed', !isMobile && !expanded);
+    document.getElementById('toggle-sidebar')?.setAttribute('aria-expanded', String(!isMobile && expanded));
+    document.getElementById('btn-sidebar-mobile-header')?.setAttribute('aria-expanded', String(isMobile && expanded));
+}
+
 function handleToggleSidebar() {
     const sidebar = document.getElementById('sidebar'); if (!sidebar) return;
-    if (window.innerWidth <= 768) { sidebar.classList.toggle('open'); sidebar.classList.remove('collapsed'); }
-    else { sidebar.classList.toggle('collapsed'); sidebar.classList.remove('open'); }
+    if (window.innerWidth <= 768) {
+        sidebar.classList.toggle('open');
+        sidebar.classList.remove('collapsed');
+    } else {
+        sidebar.classList.toggle('collapsed');
+        sidebar.classList.remove('open');
+    }
+    syncSidebarLayout();
 }
+
+window.addEventListener('resize', syncSidebarLayout);
+document.addEventListener('DOMContentLoaded', syncSidebarLayout);
 
 function switchTabs(targetTabId, activeTriggerBtnId) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); 
@@ -3538,7 +3601,7 @@ document.addEventListener("click", (e) => {
         if (!sidebar || !sidebar.classList.contains("open")) return;
         if (e.target.closest("#sidebar")) return;
         // Não fecha ao usar os próprios botões que abrem/fecham o menu
-        if (e.target.closest("#toggle-sidebar, #btn-toggle-sidebar-mobile")) return;
+        if (e.target.closest("#toggle-sidebar, #btn-toggle-sidebar-mobile, #btn-sidebar-mobile-header")) return;
         fecharSidebarMobile();
     }, true);
 
