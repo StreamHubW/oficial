@@ -757,21 +757,23 @@ function createCard(title, imgSrc, showAddButton = false, isPlaylist = false, cl
         const ativo = ehFavorito(favInfo) ? ' ativo' : '';
         htmlContent += `<div class="fav-badge${ativo}" title="Favoritar"><i class="fa-heart ${ativo ? 'fas' : 'far'}"></i></div>`;
     }
-    if (shareInfo && shareInfo.link) htmlContent += `<div class="share-badge" title="Compartilhar"><i class="fas fa-share-nodes"></i></div>`;
+    let acoesCard = '';
+    if (shareInfo && shareInfo.link) acoesCard += `<div class="share-badge" title="Compartilhar"><i class="fas fa-share-nodes"></i></div>`;
     if(isPlaylist) htmlContent += `<span class="media-type-badge"><i class="fas fa-photo-film"></i> Playlist</span>`;
     if(showAddButton) htmlContent += `<button class="add-music-badge"><i class="fas fa-plus"></i> ${isPlaylist ? "Add Playlist" : "Adicionar"}</button>`;
     if(realIndex >= 0) {
-        htmlContent += `<div class="quick-edit-badge" title="Editar mídia" aria-label="Editar mídia"><i class="fas fa-cog"></i></div>`;
-        htmlContent += `<button type="button" class="media-delete-badge" title="Excluir mídia" aria-label="Excluir mídia"><i class="fas fa-trash"></i></button>`;
+        acoesCard += `<div class="quick-edit-badge" title="Editar mídia" aria-label="Editar mídia"><i class="fas fa-cog"></i></div>`;
+        acoesCard += `<button type="button" class="media-delete-badge" title="Excluir mídia" aria-label="Excluir mídia"><i class="fas fa-trash"></i></button>`;
     }
     const isCollectionCard = favInfo && (favInfo.tipo === 'categoria' || favInfo.tipo === 'subcategoria');
     const isDynamicRecent = favInfo && favInfo.tipo === 'subcategoria' && favInfo.subcategoria === 'Vídeos Recentes';
     if (isCollectionCard && !isDynamicRecent) {
-        htmlContent += `<div class="collection-card-actions">
+        acoesCard += `<div class="collection-card-actions">
             <button type="button" class="collection-action-btn collection-edit-btn" title="Editar" aria-label="Editar ${favInfo.tipo}"><i class="fas fa-cog"></i></button>
             <button type="button" class="collection-action-btn collection-delete-btn" title="Excluir" aria-label="Excluir ${favInfo.tipo}"><i class="fas fa-trash"></i></button>
         </div>`;
     }
+    if (acoesCard) htmlContent += `<div class="card-actions-row">${acoesCard}</div>`;
     card.innerHTML = htmlContent;
     if(clickCallback) card.addEventListener('click', clickCallback);
     if(realIndex >= 0 && card.querySelector('.quick-edit-badge')) {
