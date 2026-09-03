@@ -1131,12 +1131,12 @@ async function renomearCategoriaCompleta(antiga, nova) {
             const newNodeName = btoa(unescape(encodeURIComponent(nova))).replace(/=/g, ""); 
             let urlNovoCanal = obterUrlBaseCanais().replace(".json", `/${newNodeName}.json`);
             let urlAntigoCanal = obterUrlBaseCanais().replace(".json", `/${oldNodeName}.json`);
-            await dbFetch(urlNovoCanal, { method: "PUT", body: JSON.stringify(canaisDinamicos[oldNodeName]) }); 
+            await dbFetch(urlNovoCanal, { method: "PUT", body: JSON.stringify(canaisDinamicos[oldNodeName]), headers: { 'Content-Type': 'application/json' } }); 
             await dbFetch(urlAntigoCanal, { method: "DELETE" }); 
         } 
         await recarregarDadosDoBanco(); 
         renderCrudManager(); 
-    } catch(e){ console.error("Erro ao renomear categoria:", e); } 
+    } catch(e){ console.error("Erro ao renomear categoria:", e); alert("Erro ao renomear categoria: " + e.message); } 
 }
 
 function openAdvancedEditModal(index) {
@@ -1149,21 +1149,36 @@ function openAdvancedEditModal(index) {
 
 async function saveAdvancedEditChanges(e) {
     if(e) e.preventDefault();
+    if (activeEditingIndex === null || !database[activeEditingIndex]) {
+        return alert("Não foi possível identificar a mídia em edição. Reabra a edição e tente novamente.");
+    }
     const t = document.getElementById('edit-field-title').value.trim(); const l = document.getElementById('edit-field-link').value.trim();
     const c = document.getElementById('edit-field-capa').value.trim(); const cat = document.getElementById('edit-field-category').value.trim();
     const sub = document.getElementById('edit-field-subcategory').value.trim();
     if(!t || !l || !cat) return alert("Preencha os campos!");
 
+    const btnSalvar = document.getElementById('btn-submit-edit-media');
+    const textoOriginal = btnSalvar ? btnSalvar.innerHTML : "";
+    const itemOriginal = { ...database[activeEditingIndex] };
+
     database[activeEditingIndex].título = t; database[activeEditingIndex].link = l; database[activeEditingIndex].capa = c;
     database[activeEditingIndex].categoria = cat; database[activeEditingIndex].subcategoria = sub;
-    
+
     try {
+        if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerHTML = "Salvando..."; }
         await empurrarBancoIntegralParaServidor();
         document.getElementById('edit-media-modal').classList.add('hidden');
-        await recarregarDadosDoBanco(); 
+        activeEditingIndex = null;
+        await recarregarDadosDoBanco();
         renderCrudManager();
         alert("Alteração salva com sucesso!");
-    } catch (err) { alert("Erro: " + err.message); }
+    } catch (err) {
+        // Desfaz a alteração local se a gravação remota falhar
+        database[activeEditingIndex] = itemOriginal;
+        alert("Erro ao salvar: " + err.message);
+    } finally {
+        if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerHTML = textoOriginal; }
+    }
 }
 
 async function saveMediaToDatabase(e) {
@@ -1220,13 +1235,27 @@ async function processarInjecaoDeDadosAcumulativa(novosItens) {
 }
 
 async function empurrarBancoIntegralParaServidor() {
+    if (!CONFIG.FIREBASE_URL) throw new Error("Banco de dados não configurado. Faça login novamente antes de salvar.");
+    if (!firebase.auth().currentUser) throw new Error("Sessão expirada. Entre novamente para salvar suas alterações.");
     const loteLimpoParaSalvar = database.map(({idFirebase, ...resto}) => resto);
     let resposta = await dbFetch(CONFIG.FIREBASE_URL, { method: "PUT", body: JSON.stringify(loteLimpoParaSalvar), headers: { 'Content-Type': 'application/json' } });
-    if (!resposta.ok) throw new Error("Erro na gravação remota do banco.");
+    if (!resposta.ok) {
+        let detalhe = "";
+        try { detalhe = (await resposta.text()) || ""; } catch (e) {}
+        throw new Error(`Erro na gravação remota do banco (HTTP ${resposta.status}). ${detalhe}`.trim());
+    }
 }
 
-async function deletarMidiaUnica(indexNoBanco) { try { database.splice(indexNoBanco, 1); await empurrarBancoIntegralParaServidor(); await recarregarDadosDoBanco(); renderCrudManager(); } catch(e){} }
-async function deletarSubcategoria(cat, sub) { try { database = database.filter(item => !(item.categoria === cat && item.subcategoria === sub)); await empurrarBancoIntegralParaServidor(); await recarregarDadosDoBanco(); renderCrudManager(); } catch(e){} }
+async function deletarMidiaUnica(indexNoBanco) {
+    const backup = database.slice();
+    try { database.splice(indexNoBanco, 1); await empurrarBancoIntegralParaServidor(); await recarregarDadosDoBanco(); renderCrudManager(); }
+    catch(e){ database = backup; alert("Erro ao excluir mídia: " + e.message); }
+}
+async function deletarSubcategoria(cat, sub) {
+    const backup = database.slice();
+    try { database = database.filter(item => !(item.categoria === cat && item.subcategoria === sub)); await empurrarBancoIntegralParaServidor(); await recarregarDadosDoBanco(); renderCrudManager(); }
+    catch(e){ database = backup; alert("Erro ao excluir subcategoria: " + e.message); }
+}
 async function deletarCategoriaCompleta(cat) { 
     try { 
         database = database.filter(item => item.categoria !== cat); 
@@ -1239,10 +1268,19 @@ async function deletarCategoriaCompleta(cat) {
         selectedSubcategory = ''; 
         await recarregarDadosDoBanco(); 
         renderCrudManager(); 
-    } catch(e){ console.error("Erro ao deletar categoria completa:", e); } 
+    } catch(e){ console.error("Erro ao deletar categoria completa:", e); alert("Erro ao excluir categoria: " + e.message); } 
 }
 
-async function renameSubcategoryComplete(cat, antigaSub, novaSub) { try { database.forEach(item => { if(item.categoria === cat && item.subcategoria === antigaSub) item.subcategoria = novaSub; }); await empurrarBancoIntegralParaServidor(); await recarregarDadosDoBanco(); renderCrudManager(); } catch(e){} }
+async function renomearSubcategoriaCompleta(cat, antigaSub, novaSub) {
+    try {
+        database.forEach(item => { if(item.categoria === cat && item.subcategoria === antigaSub) item.subcategoria = novaSub; });
+        await empurrarBancoIntegralParaServidor();
+        await recarregarDadosDoBanco();
+        renderCrudManager();
+    } catch(e){ alert("Erro ao renomear subcategoria: " + e.message); }
+}
+// Alias mantido para compatibilidade com chamadas antigas
+const renameSubcategoryComplete = renomearSubcategoriaCompleta;
 
 function downloadJSON(obj, filename) {
     const prepararObjeto = Array.isArray(obj) ? obj.map(({idFirebase, ...r}) => r) : obj;
@@ -1456,7 +1494,8 @@ function setupEventListeners() {
                 const nodeName = btoa(unescape(encodeURIComponent(catDestino))).replace(/=/g, "");
                 let urlCanalIndividual = obterUrlBaseCanais().replace(".json", `/${nodeName}.json`);
                 
-                await dbFetch(urlCanalIndividual, { method: "PUT", body: JSON.stringify(payload) });
+                const respCanal = await dbFetch(urlCanalIndividual, { method: "PUT", body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } });
+                if (!respCanal.ok) throw new Error(`Falha ao gravar o canal (HTTP ${respCanal.status}).`);
                 
                 alert(`Canal vinculado com sucesso na categoria "${catDestino}"!`);
                 
