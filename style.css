@@ -2621,3 +2621,124 @@ body.theme-claro .sort-select {
 .player-header.compact-mode .player-controls-group #btn-video-desc::after { content: "Descrição"; }
 .player-header.compact-mode .player-controls-group #btn-fav-current::after { content: "Favoritar"; }
 #btn-fav-current.ativo { color: #e74c3c; }
+
+/* ==========================================
+   CORREÇÃO: ALINHAMENTO DOS BOTÕES DE AÇÃO DOS CARDS
+   (engrenagem, compartilhar e apagar lado a lado,
+   no desktop e no mobile, também em categorias/subcategorias)
+   ========================================== */
+.card {
+    --card-btn-size: 30px;
+    --card-btn-gap: 6px;
+    --card-btn-edge: 8px;
+    --card-btn-step: calc(var(--card-btn-size) + var(--card-btn-gap));
+}
+
+/* Mesmo tamanho e mesma linha de base para os três botões */
+.card .share-badge,
+.card .quick-edit-badge,
+.card .media-delete-badge {
+    width: var(--card-btn-size);
+    height: var(--card-btn-size);
+    padding: 0;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    line-height: 1;
+    bottom: var(--card-btn-edge);
+    z-index: 6;
+}
+
+/* Slot 1 (canto): apagar */
+.card .media-delete-badge { right: var(--card-btn-edge); }
+
+/* Slot 2: engrenagem (assume o canto quando não há apagar) */
+.card .quick-edit-badge { right: var(--card-btn-edge); }
+.card:has(.media-delete-badge) .quick-edit-badge {
+    right: calc(var(--card-btn-edge) + var(--card-btn-step));
+}
+
+/* Slot 3: compartilhar (recua conforme os botões existentes) */
+.card .share-badge { right: var(--card-btn-edge); }
+.card:has(.quick-edit-badge) .share-badge,
+.card:has(.media-delete-badge) .share-badge {
+    right: calc(var(--card-btn-edge) + var(--card-btn-step));
+}
+.card:has(.quick-edit-badge):has(.media-delete-badge) .share-badge {
+    right: calc(var(--card-btn-edge) + var(--card-btn-step) * 2);
+}
+
+/* Cards de categorias e subcategorias: botões sempre lado a lado */
+.card .collection-card-actions {
+    right: var(--card-btn-edge);
+    bottom: var(--card-btn-edge);
+    gap: var(--card-btn-gap);
+    flex-wrap: nowrap;
+    align-items: center;
+}
+.card .collection-action-btn {
+    width: var(--card-btn-size);
+    height: var(--card-btn-size);
+    padding: 0;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+/* Espaço reservado no título para não ficar sob os botões */
+.card:has(.share-badge) h4,
+.card:has(.quick-edit-badge) h4,
+.card:has(.media-delete-badge) h4,
+.card:has(.collection-card-actions) h4 {
+    padding-right: calc(var(--card-btn-edge) * 2 + var(--card-btn-size) * 2 + var(--card-btn-gap));
+    min-height: 52px;
+}
+.card:has(.share-badge):has(.quick-edit-badge):has(.media-delete-badge) h4 {
+    padding-right: calc(var(--card-btn-edge) * 2 + var(--card-btn-size) * 3 + var(--card-btn-gap) * 2);
+}
+
+@media (max-width: 768px) {
+    .card {
+        --card-btn-size: 28px;
+        --card-btn-gap: 5px;
+        --card-btn-edge: 6px;
+    }
+    .card .share-badge,
+    .card .quick-edit-badge,
+    .card .media-delete-badge,
+    #mosaic-grid .card .share-badge,
+    #mosaic-grid .card .quick-edit-badge,
+    #mosaic-grid .card .media-delete-badge,
+    #mosaic-grid .card .collection-action-btn {
+        width: var(--card-btn-size) !important;
+        height: var(--card-btn-size) !important;
+        padding: 0 !important;
+        font-size: 0.8rem !important;
+    }
+    #mosaic-grid .card .media-delete-badge { right: var(--card-btn-edge); bottom: var(--card-btn-edge); }
+    #mosaic-grid .card:has(.media-delete-badge) .quick-edit-badge {
+        right: calc(var(--card-btn-edge) + var(--card-btn-step));
+    }
+    #mosaic-grid .card .collection-card-actions {
+        right: var(--card-btn-edge);
+        bottom: var(--card-btn-edge);
+        gap: var(--card-btn-gap);
+    }
+    #mosaic-grid .card:has(.media-delete-badge) h4,
+    #mosaic-grid .card:has(.collection-card-actions) h4 {
+        padding-right: calc(var(--card-btn-edge) * 2 + var(--card-btn-size) * 2 + var(--card-btn-gap));
+        min-height: 48px;
+    }
+    #mosaic-grid .card:has(.share-badge):has(.quick-edit-badge):has(.media-delete-badge) h4 {
+        padding-right: calc(var(--card-btn-edge) * 2 + var(--card-btn-size) * 3 + var(--card-btn-gap) * 2);
+    }
+}
+
+@media (max-width: 480px) {
+    .card .share-badge { padding: 0; font-size: 0.8rem; }
+    .card .fav-badge { width: 26px; height: 26px; }
+}
